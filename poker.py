@@ -1,5 +1,5 @@
-from deck import Deck
-from card import Card
+from table import Deck, Board
+from card import Card, Hand
 from player import Player
 from bot import Bot
 
@@ -151,60 +151,105 @@ class Game:
         return bestHand, bestVal
         # print(int(bestVal, 2))
         # return bestHand, math.floor(math.log(int(bestVal, 2), 2))
+
+    # -1 if handB > handA, 1 if handA > handB, 0 if tied    
+    # def tiebreak(handA, handB, handVal):
+    #     if handVal == 10:
+
+    #     elif handVal == 9:
+
+    #     elif handVal == 8:
             
 
-    def betting(self):
-        self.openBet = 0
-        playerNum = self.nextActive(self.dealer)
-        actions = []
-        betNum = 1
-        currBet = 0
-        while betNum <= len(self.players) or self.openBet != self.players[playerNum].currBet():
-            if betNum == 1:
-                actions = ["Bet", "Check", "Fold"]
-            elif self.openBet == 0:
-                actions = ["Call", "Check", "Fold", "Raise"]
-            else:
-                actions = ["Call", "Fold", "Raise"]
-            currBet = self.players[playerNum].getBet(self.community, actions)
-            if currBet >= self.openBet:
-                self.openBet = currBet
-            playerNum = self.nextActive(playerNum)
-            betNum += 1
+    # def betting(self):
+    #     self.openBet = 0
+    #     playerNum = self.nextActive(self.dealer)
+    #     actions = []
+    #     betNum = 1
+    #     currBet = 0
+    #     while betNum <= len(self.players) or self.openBet != self.players[playerNum].currBet():
+    #         if betNum == 1:
+    #             actions = ["Bet", "Check", "Fold"]
+    #         elif self.openBet == 0:
+    #             actions = ["Call", "Check", "Fold", "Raise"]
+    #         else:
+    #             actions = ["Call", "Fold", "Raise"]
+    #         currBet = self.players[playerNum].getBet(self.community, actions)
+    #         if currBet >= self.openBet:
+    #             self.openBet = currBet
+    #         playerNum = self.nextActive(playerNum)
+    #         betNum += 1
         
 
-        roundPot = 0
-        roundActive = 0
-        for player in self.players:
-            roundPot += player.currBet()
-            if player.currBet() != 0:
-                roundActive += 1
+    #     roundPot = 0
+    #     roundActive = 0
+    #     for player in self.players:
+    #         roundPot += player.currBet()
+    #         if player.currBet() != 0:
+    #             roundActive += 1
         
-        for player in self.players:
-            if player.isActive():
-                if player.currBet() < self.openBet:
-                    player.setExpect(player.currBet() * roundActive)
-                else:
-                    player.setExpect(self.pot + roundPot)
+    #     for player in self.players:
+    #         if player.isActive():
+    #             if player.currBet() < self.openBet:
+    #                 player.setExpect(player.currBet() * roundActive)
+    #             else:
+    #                 player.setExpect(self.pot + roundPot)
         
-        self.pot += roundPot
+    #     self.pot += roundPot
     
-    def results(self):
-        for player in self.players:
-            self.handValue(player.getHand())
-        pass
+    # def results(self):
+    #     maxVal = 0
+    #     maxHand = None
+    #     winner = None
+    #     for player in self.players:
+    #         currHand, currVal = self.handValue(player.getHand())
+    #         if currVal > maxVal:
+    #             maxVal = currVal
+    #             maxHand = currHand
+    #             winner = player
+    #         elif currVal == maxVal:
+    #             result = tiebreak(maxHand, currHand, currVal)
+    #             if result < 0:
+    #                 maxHand = currHand
+    #             elif result == 0:
+
+    #             else:
+
+                
+    #     pass
 
 
 def main():
-    players = [Player("arnold"), Player("bom"), Player("cork"), Player("probaldo", True, Bot())]
-    poker = Game(players = players)
-    poker.reset()
+    # players = [Player("arnold"), Player("bom"), Player("cork"), Player("probaldo", True, Bot())]
+    # poker = Game(players = players)
+    # poker.reset()
 
-    poker.community = poker.deck.dealCards(5)
-    # poker.community = [Card("hearts", 12), Card("clubs", 10), Card("spades", 11), Card("diamonds", 13), Card("hearts", 9)]
-    bestHand = poker.handValue(poker.deck.dealCards(2))
-    # bestHand = poker.handValue([])
-    print([str(x) for x in bestHand[0]], bestHand[1])
+    # poker.community = poker.deck.dealCards(5)
+    # # poker.community = [Card("hearts", 12), Card("clubs", 10), Card("spades", 11), Card("diamonds", 13), Card("hearts", 9)]
+    # bestHand = poker.handValue(poker.deck.dealCards(2))
+    # # bestHand = poker.handValue([])
+    # print([str(x) for x in bestHand[0]], bestHand[1])
+
+    # testHand = Hand((Card("hearts", 12), Card("clubs", 10), Card("spades", 11), Card("diamonds", 13), Card("hearts", 9)))
+
+    hands = []
+
+    for x in range(10000):
+        deck = Deck()
+        deck.shuffle()
+        for i in range(10):
+            hands.append(Hand(deck.dealCards(5)))
+    
+    hands.sort(key = lambda x: x.getHandValue(), reverse = True)
+    
+    for i in range(10): 
+        print(f"{i+1}: {hands[i]} \t | {hands[i].getHandValue():,}")
+    
+    # testHand2 = Hand((Card("hearts", 12), Card("clubs", 9), Card("spades", 12), Card("diamonds", 13), Card("hearts", 9)))
+    
+    
+    # print(testHand2.getHandValue())
+    
 
     # poker.bettingPrehand()
     # poker.dealHands()
