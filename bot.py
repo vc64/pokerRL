@@ -1,8 +1,8 @@
-from player import Player
+from player import CardPlayer
 
-class Bot(Player):
-    def __init__(self):
-        pass
+class BotPlayer(CardPlayer):
+    def __init__(self, name, score):
+        super().__init__(name, score)
 
     def getAction(self, money, openBet, hand, community, actions):
         prob = getProb(hand)

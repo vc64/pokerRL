@@ -35,7 +35,9 @@ class Card:
         """Compare two card values; returns -1 (less than), 0 (equal), 1 (greater than)"""
         return -1 if self._number < otherCard._number else 0 if self._number == otherCard._number else 1
     
-    def __str__(self):
+
+
+    def __repr__(self):
         return Vals(self._number).name + " of " + Suits[self._suit].value
 
 
@@ -97,21 +99,21 @@ class Hand:
         royal = all([self.cards[i].getValue() == range(14, 14 - len(self.cards), -1)[i] for i in range(len(self.cards))])
         straight = isStraight(self.cards) or (self.cards[0].isVal(14) and isStraight(self.cards[1:] + (Card("s",1),)))
         flush = len(self.suitFreqs.values()) == 1
-        fourKind, threeKind, pair, twoPair = sameVals()
+        quad, triple, pair, twoPair = sameVals()
 
         if royal and flush:
             handScore = 9
         elif straight and flush:
             handScore = 8
-        elif fourKind:
+        elif quad:
             handScore = 7
-        elif threeKind and pair:
+        elif triple and pair:
             handScore = 6
         elif flush:
             handScore = 5
         elif straight:
             handScore = 4
-        elif threeKind:
+        elif triple:
             handScore = 3
         elif twoPair:
             handScore = 2

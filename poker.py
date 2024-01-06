@@ -1,48 +1,195 @@
 from table import Deck, Board
 from card import Card, Hand
-from player import Player
-from bot import Bot
+from player import CardPlayer, HumanPlayer
+from bot import BotPlayer
 
 import random
 from itertools import combinations
 import math
 
-class GameObs:
-    def __init__(self, funcs: list, ids = []):
-        if (len(ids) != len(funcs)):
-            ids = list(range(len(players)))
-        self.playerFuncs = {}
-        for i in range(len(funcs)):
-            self.subscribe(funcs[i], ids[i])
+class Move:
+    """General class to allow Player to make a Move based on game info."""
+    def __init__(self, game, playerID = -1,):
+        self.playerID = playerID
+        self.game = game
+
+    def isValid(self):
+        pass
+
+class PokerMove(Move):
+    def __init__(self, playerID: int, isValid):
+        super().__init__(playerID)
+        self.action = ""
+        self.amount = -1
+        self.isSet = False
+        self.validMoveActions = self.game.getValidMoveActions(self.playerID)
+        self.isValid = lambda : self.game.validMoveFunc(self.playerID)(self.action, self.amount)
+        self.minBet = self.minBetFunc(self.playerID)
     
-    def subscribe(self, playerFunc, playerID: int):
-        self.playerFuncs[playerID] = playerFunc
+    def setMove(self, action: str, amount = 0) -> bool:
+        """Sets attributes to match specified move if valid. Returns whether set or not."""
+        if self.isSet:
+            raise Exception("Move already set.")
+        self.action = action
+        if action in ["Call", "Check", "Fold"]:
+            amount = 0
+        self.amount = amount
+        self.isSet = self.isValid()
+        if self.isSet:
+            self.game.update(self)
+        return self.isSet
+
+# class GameObs:
+#     """Observable-like class for Game"""
+#     def __init__(self, funcs: list, ids = []):
+#         if (len(ids) != len(funcs)):
+#             ids = list(range(len(funcs)))
+#         self.playerFuncs = {}
+#         for i in range(len(funcs)):
+#             self.subscribe(funcs[i], ids[i])
     
-    def update(self, orderedIDs):
-        for p in orderedIDs:
-            self.playerFuncs[p]() # pass in game state in some format -> likely as game object
+#     def subscribe(self, playerFunc, playerID: int):
+#         self.playerFuncs[playerID] = playerFunc
+    
+#     def update(self, orderedIDs, gameObj, moveObj):
+#         for p in orderedIDs:
+#             moveObj.setPlayer(p)
+#             self.playerFuncs[p](gameObj, moveObj) # pass in game state in some format -> likely as game object
 
 class Game:
-    def __init__(self, players = list):
+    """Represents a game."""
+    def __init__(self, players = list, moves = list):
         self.players = dict(enumerate(players))
         self.ids = list(range(len(players)))
-        self.obs = GameObs([p.makeMove for p in players])
+        # self.obs = GameObs([p.makeMove for p in players], self.ids)
+        self.moveActions = moves
     
-    def start():
+    def start(self):
         """Start the game. Will block until game ends."""
         pass
 
-    def getValidMoves():
-        """Return list of valid moves for specific player."""
+    def getValidMoveActions(self):
+        """Return list of valid move actions for specific player."""
         pass
 
-    def isValidMove():
+    def isValidMove(self):
         """Check if specified move is valid."""
         pass
 
-    def update():
-        """Update game with given move if valid."""
+    def generateMove(self):
+        """Return a move object for the game."""
         pass
+
+    def update(self, move: Move):
+        """Update game with given move."""
+        pass
+
+
+class CardGame(Game):
+    """Represents a card game (has a deck)."""
+    def __init__(self, players = list, moves = list):
+        super().__init__(players, moves)
+        self.deck = Deck()
+        self.deck.shuffle()
+
+class Poker(CardGame):
+    def __init__(self, players=list):
+        super().__init__(players, ["Check", "Bet", "Raise", "Call", "Fold"])
+        self.boardCards = []
+        self.lastNotableMove: PokerMove = None
+
+    def start(self):
+        """Start the game. Will block until game ends."""
+        self.deck.resetDeck()
+        self.deck.shuffle()
+
+        random.shuffle(self.ids) # ..., D, SB, BB,
+
+        # pre-flop
+        print("pre-flop")
+        self.players[self.ids[-2]]
+        for playerID in self.ids:
+            currPlayer = self.players[playerID]
+            currPlayer.addToHand(self.deck.dealCards(2))
+            currPlayer.makeMove(self, PokerMove(self, playerID, self.validMoveFunc(playerID)))
+
+        # self.obs.update(self.ids, self, PokerMove())
+
+        # flop
+        print("flop")
+        self.boardCards.append(self.deck.dealCards(3))
+        self.obs.update(self.ids, self)
+
+        # turn
+        print("turn")
+        self.boardCards.append(self.deck.dealCards())
+        self.obs.update(self.ids, self)
+
+        # river
+        print("flop")
+        self.boardCards.append(self.deck.dealCards())
+        self.obs.update(self.ids, self)
+
+        # showdown
+    
+    def turn(self, handCards: int, boardCards: int):
+        index = 0
+        currPlayerID = self.ids[index]
+        currPlayer = self.players[currPlayerID]
+        while currPlayer.inRound:
+            if handCards > 0:
+                currPlayer.addToHand(self.deck.dealCards(handCards))
+            elif boardCards > 0:
+                self.boardCards.append(self.deck.dealCards(boardCards))
+            currPlayer.makeMove(self, PokerMove(currPlayerID, self.validMoveFunc(currPlayerID)))
+            
+            # update variables for next player
+            index = (index + 1) % len(self.ids)
+            currPlayerID = self.ids[index]
+            currPlayer = self.players[currPlayerID]
+
+    def getValidMoveActions(self, playerID):
+        """Return list of valid move actions for specific player."""
+        possibleMoves = []
+        if self.lastNotableMove.action == "Check":
+            possibleMoves = self.moveActions
+        # elif self.lastNotableMove.action == "Call":
+        #     possibleMoves = []
+        elif self.lastNotableMove.action in ["Bet", "Raise"] and self.lastNotableMove.playerID == playerID:
+            possibleMoves = [] if self.lastNotableMove.playerID == playerID else ["Call", "Raise", "Fold"]
+        else:
+            possibleMoves = ["Fold"]
+        return possibleMoves
+
+    def validMoveFunc(self, playerID: int):
+        """Return function for move validation for specified player"""
+        def isValid(action: str, amount: int):
+            return (action in self.getValidMoveActions(playerID) and amount <= self.players[playerID].score 
+                    and amount >= self.minBetFunc(playerID)(action))
+        return isValid
+    
+    def minBetFunc(self, playerID: int):
+        def minBet(action: str):
+            if action == "Raise":
+                return self.lastNotableMove.amount * 2
+            elif action == "Bet":
+                return 1
+            else:
+                return -1
+        return minBet
+
+    def generateMove(self):
+        return PokerMove(self.getValidMoveActions(), self.isValidMove)
+
+    def update(self, move: PokerMove):
+        """Update game with given move."""
+        currPlayer = self.players[move.playerID]
+        
+        print(f"Player {currPlayer.name}: {move.action} {move.amount}")
+        pass
+
+
+
 
 
 # class Game:
@@ -272,7 +419,7 @@ def main():
 
     hands = []
 
-    for x in range(10000):
+    for x in range(100):
         deck = Deck()
         deck.shuffle()
         for i in range(10):
@@ -282,6 +429,9 @@ def main():
     
     for i in range(10): 
         print(f"{i+1}: {hands[i]} \t | {hands[i].getHandValue():,}")
+    
+    g = Poker([HumanPlayer("Vervov",100)])
+    g.start()
     
     # testHand2 = Hand((Card("hearts", 12), Card("clubs", 9), Card("spades", 12), Card("diamonds", 13), Card("hearts", 9)))
     
