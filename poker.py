@@ -2,6 +2,7 @@ from table import Deck, Board
 from card import Card, Hand
 from player import CardPlayer, HumanPlayer
 from bot import BotPlayer
+from pot import Pot
 
 import random
 from itertools import combinations
@@ -9,7 +10,7 @@ import math
 
 class Move:
     """General class to allow Player to make a Move based on game info."""
-    def __init__(self, game, playerID = -1,):
+    def __init__(self, game, playerID = -1):
         self.playerID = playerID
         self.game = game
 
@@ -17,14 +18,14 @@ class Move:
         pass
 
 class PokerMove(Move):
-    def __init__(self, playerID: int, isValid):
-        super().__init__(playerID)
+    def __init__(self, game, playerID: int):
+        super().__init__(game, playerID)
         self.action = ""
         self.amount = -1
         self.isSet = False
         self.validMoveActions = self.game.getValidMoveActions(self.playerID)
         self.isValid = lambda : self.game.validMoveFunc(self.playerID)(self.action, self.amount)
-        self.minBet = self.minBetFunc(self.playerID)
+        self.minBet = self.game.minBetFunc()
     
     def setMove(self, action: str, amount = 0) -> bool:
         """Sets attributes to match specified move if valid. Returns whether set or not."""
@@ -37,6 +38,8 @@ class PokerMove(Move):
         self.isSet = self.isValid()
         if self.isSet:
             self.game.update(self)
+        else:
+            print("Invalid move: please try again.")
         return self.isSet
 
 # class GameObs:
@@ -76,9 +79,9 @@ class Game:
         """Check if specified move is valid."""
         pass
 
-    def generateMove(self):
-        """Return a move object for the game."""
-        pass
+    # def generateMove(self):
+    #     """Return a move object for the game."""
+    #     pass
 
     def update(self, move: Move):
         """Update game with given move."""
@@ -97,6 +100,8 @@ class Poker(CardGame):
         super().__init__(players, ["Check", "Bet", "Raise", "Call", "Fold"])
         self.boardCards = []
         self.lastNotableMove: PokerMove = None
+        self.pot = Pot()
+        self.playersInRound = 0
 
     def start(self):
         """Start the game. Will block until game ends."""
@@ -104,71 +109,119 @@ class Poker(CardGame):
         self.deck.shuffle()
 
         random.shuffle(self.ids) # ..., D, SB, BB,
+        self.pot = Pot()
+        for playerID in self.ids:
+            self.players[playerID].inRound = True
+            self.playersInRound += 1
 
         # pre-flop
         print("pre-flop")
-        self.players[self.ids[-2]]
+        self.pot.addToPot(self.ids[-2], 0.5)
+        self.pot.addToPot(self.ids[-1], 1)
+        self.turn(2, 0)
+
+        print("flop")
+        self.turn(0,3)
+
+        print("turn")
+        self.turn(0,1)
+
+        print("river")
+        self.turn(0,1)
+
+        if self.playersInRound > 1:
+            # self.pot.splitPot()
+            sortedPlayers = sorted([(self.getBestHandVal(playerID), playerID) for playerID in self.ids 
+                                    if self.players[playerID].inRound], reverse=True)
+            prevHandVal = -1
+            tieredPlayers = []
+            for handVal, playerID in sortedPlayers:
+                if prevHandVal != handVal:
+                    tieredPlayers.append([])
+                tieredPlayers[-1].append(playerID)
+            
+            for playerID, winAmount in self.pot.splitPot(tieredPlayers).items():
+                self.players[playerID].updateScore(winAmount)
+        
         for playerID in self.ids:
-            currPlayer = self.players[playerID]
-            currPlayer.addToHand(self.deck.dealCards(2))
-            currPlayer.makeMove(self, PokerMove(self, playerID, self.validMoveFunc(playerID)))
+            print(f"{playerID} {self.players[playerID].score} bb")
+
+        # for playerID in self.ids:
+        #     currPlayer = self.players[playerID]
+        #     currPlayer.addToHand(self.deck.dealCards(2))
+        #     currPlayer.makeMove(self, PokerMove(self, playerID, self.validMoveFunc(playerID)))
 
         # self.obs.update(self.ids, self, PokerMove())
 
         # flop
-        print("flop")
-        self.boardCards.append(self.deck.dealCards(3))
-        self.obs.update(self.ids, self)
+        # print("flop")
+        # self.boardCards.append(self.deck.dealCards(3))
+        # self.obs.update(self.ids, self)
 
-        # turn
-        print("turn")
-        self.boardCards.append(self.deck.dealCards())
-        self.obs.update(self.ids, self)
+        # # turn
+        # print("turn")
+        # self.boardCards.append(self.deck.dealCards())
+        # self.obs.update(self.ids, self)
 
-        # river
-        print("flop")
-        self.boardCards.append(self.deck.dealCards())
-        self.obs.update(self.ids, self)
+        # # river
+        # print("flop")
+        # self.boardCards.append(self.deck.dealCards())
+        # self.obs.update(self.ids, self)
 
         # showdown
     
     def turn(self, handCards: int, boardCards: int):
+        if boardCards > 0:
+            self.boardCards += list(self.deck.dealCards(boardCards))
+        elif handCards > 0:
+            for i in range(len(self.ids)):
+                if self.players[self.ids[i]].inRound:
+                    self.players[self.ids[i]].addToHand(self.deck.dealCards(handCards))
+
         index = 0
         currPlayerID = self.ids[index]
         currPlayer = self.players[currPlayerID]
         while currPlayer.inRound:
-            if handCards > 0:
-                currPlayer.addToHand(self.deck.dealCards(handCards))
-            elif boardCards > 0:
-                self.boardCards.append(self.deck.dealCards(boardCards))
-            currPlayer.makeMove(self, PokerMove(currPlayerID, self.validMoveFunc(currPlayerID)))
-            
+            if self.lastNotableMove != None:
+                print(self.lastNotableMove.action, self.lastNotableMove.amount, self.lastNotableMove.playerID)
+                print(currPlayerID, currPlayer.currBet)
+            if self.playersInRound == 1 or (self.lastNotableMove != None and self.lastNotableMove.playerID == currPlayerID 
+                and self.lastNotableMove.amount == currPlayer.currBet):
+                break
+            currPlayer.makeMove(self, PokerMove(self, currPlayerID))
+
             # update variables for next player
             index = (index + 1) % len(self.ids)
             currPlayerID = self.ids[index]
             currPlayer = self.players[currPlayerID]
+        
+        self.pot.advanceTurn()
+        self.lastNotableMove = None
+        if self.playersInRound == 2:
+            self.endRound()
 
     def getValidMoveActions(self, playerID):
         """Return list of valid move actions for specific player."""
         possibleMoves = []
-        if self.lastNotableMove.action == "Check":
-            possibleMoves = self.moveActions
-        # elif self.lastNotableMove.action == "Call":
-        #     possibleMoves = []
-        elif self.lastNotableMove.action in ["Bet", "Raise"] and self.lastNotableMove.playerID == playerID:
-            possibleMoves = [] if self.lastNotableMove.playerID == playerID else ["Call", "Raise", "Fold"]
-        else:
-            possibleMoves = ["Fold"]
+        if self.lastNotableMove == None or self.lastNotableMove.action == "Check":
+            possibleMoves = ["Check", "Bet"]
+        elif self.lastNotableMove.action in ["Bet", "Raise"]:
+            possibleMoves = [] if self.lastNotableMove.playerID == playerID else ["Call"]
+            if self.players[playerID].score > self.lastNotableMove.amount:
+                possibleMoves.append("Raise")
+        possibleMoves.append("Fold")
         return possibleMoves
 
     def validMoveFunc(self, playerID: int):
         """Return function for move validation for specified player"""
         def isValid(action: str, amount: int):
+            if amount == self.players[playerID].score and amount > self.lastNotableMove.amount and action == "Raise":
+                return True
             return (action in self.getValidMoveActions(playerID) and amount <= self.players[playerID].score 
-                    and amount >= self.minBetFunc(playerID)(action))
+                    and amount >= self.minBetFunc()(action))
         return isValid
     
-    def minBetFunc(self, playerID: int):
+    def minBetFunc(self):
         def minBet(action: str):
             if action == "Raise":
                 return self.lastNotableMove.amount * 2
@@ -178,231 +231,38 @@ class Poker(CardGame):
                 return -1
         return minBet
 
-    def generateMove(self):
-        return PokerMove(self.getValidMoveActions(), self.isValidMove)
+    # def generateMove(self):
+    #     return PokerMove(self, )
 
     def update(self, move: PokerMove):
-        """Update game with given move."""
-        currPlayer = self.players[move.playerID]
+        """Update game with given move. Should only be called after move is validated."""
+        currPlayer = self.players[move.playerID]        
+        currPlayer.isAllIn = move.amount == currPlayer.score
+        currPlayer.inRound = move.action != "Fold"
+        self.playersInRound -= move.action == "Fold"
+
+        if move.action == "Check" and (self.lastNotableMove == None or self.lastNotableMove.action != "Check"):
+            self.lastNotableMove = move
+        elif move.action in ["Bet", "Raise"]:
+            if move.action == "Raise" and currPlayer.isAllIn and move.amount <= self.minBetFunc()("Raise"):
+                allInMove = PokerMove(self, move.playerID)
+                allInMove.action = "Call"
+                allInMove.amount = move.amount
+                allInMove.isSet = True
+                self.lastNotableMove = allInMove
+            else:
+                self.lastNotableMove = move
+        elif move.action == "Call":
+            move.amount = self.lastNotableMove.amount
         
-        print(f"Player {currPlayer.name}: {move.action} {move.amount}")
+        self.pot.addToPot(move.playerID, move.amount)
+        print(f"Player {currPlayer.name}: {move.action}{' '+str(move.amount) if move.action in ['Bet', 'Call', 'Raise'] else ''}")
+    
+    def endRound(self):
         pass
-
-
-
-
-
-# class Game:
-#     def __init__(self, players=[]):
-#         self.deck = Deck()
-#         self.players = players
-#         self.pot = []
-#         self.ante = 1
-#         self.roundNum = 1
-#         self.dealer = 0
-#         self.SB = 5
-#         self.BB = 10
-#         self.community = []
-
-#     def addPlayer(self, player):
-#         self.players.append(player)
     
-#     def next(self, playerNum):
-#         return (playerNum + 1) % len(self.players)
-    
-#     #will loop forever if none active
-#     def nextActive(self, playerNum):
-#         while not self.players[next(playerNum)].isActive():
-#             playerNum = self.next(playerNum)
-#         return self.next(playerNum)
-
-#     def reset(self):
-#         self.deck.resetDeck()
-#         self.deck.shuffle()
-#         self.pot = {}
-#         for i in range(len(self.players)):
-#             if self.players[i].getMoney() <= 0:
-#                 if i != self.dealer:
-#                     self.dealer -= 1
-#                 del self.players[i]
-        
-#         if self.roundNum == 1:
-#             self.dealer = random.randint(0,len(self.players))
-#         else:
-#             self.dealer = next(self.dealer)
-        
-#     def bettingPrehand(self):
-#         self.ante = self.roundNum * 2
-#         for i in range(len(self.players)):
-#             if i == self.next(self.dealer):
-#                 self.players[i].bet(self.SB)
-#             elif i == self.next(self.next(self.dealer)):
-#                 self.players[i].bet(self.BB)
-#             else:
-#                 self.players[i].bet(self.ante)
-
-#         # get ante from players
-    
-#     def dealHands(self):
-#         for player in self.players:
-#             if player.isActive():
-#                 player.setHand(self.deck.dealCards(2))
-    
-#     def dealComm(self, roundNum):
-#         if roundNum == 1:
-#             self.community = self.deck.dealCards(3)
-#         elif roundNum == 2 or roundNum == 3:
-#             self.community.append(self.deck.dealCard())
-
-#     def handValue(self, hand):
-#         bestHand = self.community
-#         bestVal = 0
-#         # bestVal = '0'
-#         for group in combinations(hand + self.community, 5):
-#             suitFreq = {}
-#             valFreq = {}
-#             small = group[0].getVal()
-#             large = group[0].getVal()
-#             royalNums = True
-#             for card in group:
-#                 royalNums = royalNums and (card.getVal() == 1 or card.getVal() >= 10)
-
-#                 if card.getVal() < small:
-#                     small = card.getVal()
-#                 if card.getVal() > large:
-#                     large = card.getVal()
-
-#                 try:
-#                     valFreq[card.getVal()] += 1
-#                 except:
-#                     valFreq[card.getVal()] = 1
-                
-#                 try:
-#                     suitFreq[card.getSuit()] += 1
-#                 except:
-#                     suitFreq[card.getSuit()] = 1
-            
-#             flush = False
-#             straight = False
-#             quad = False
-#             triple = False
-#             twoPair = False
-#             pair = False
-
-#             flush = len(suitFreq) == 1
-#             for val, freq in valFreq.items():
-#                 quad = quad or freq == 4
-#                 triple = triple or freq == 3
-#                 twoPair = twoPair or (pair and freq == 2)
-#                 pair = pair or freq == 2
-            
-#             unique = not pair and not twoPair and not triple and not quad
-#             straight = unique and (large - small) == 4
-            
-#             # values = [royalNums and unique, straight and flush, quad, triple and pair, 
-#             #           flush, straight, triple, twoPair, pair, True]
-
-#             # binVal = ''.join(['1' if x else '0' for x in values])
-#             # if binVal > bestVal:
-#             #     bestVal = binVal
-#             #     bestHand = group
-
-#             handVal = 0
-#             if royalNums and unique:
-#                 handVal = 10
-#             elif straight and flush:
-#                 handVal = 9
-#             elif quad:
-#                 handVal = 8
-#             elif triple and pair:
-#                 handVal = 7
-#             elif flush:
-#                 handVal = 6
-#             elif straight: 
-#                 handVal = 5
-#             elif triple:
-#                 handVal = 4
-#             elif twoPair:
-#                 handVal = 3
-#             elif pair:
-#                 handVal = 2
-#             else:
-#                 handVal = 1
-            
-#             if bestVal < handVal:
-#                 bestVal = handVal
-#                 bestHand = group
-
-#         return bestHand, bestVal
-        # print(int(bestVal, 2))
-        # return bestHand, math.floor(math.log(int(bestVal, 2), 2))
-
-    # -1 if handB > handA, 1 if handA > handB, 0 if tied    
-    # def tiebreak(handA, handB, handVal):
-    #     if handVal == 10:
-
-    #     elif handVal == 9:
-
-    #     elif handVal == 8:
-            
-
-    # def betting(self):
-    #     self.openBet = 0
-    #     playerNum = self.nextActive(self.dealer)
-    #     actions = []
-    #     betNum = 1
-    #     currBet = 0
-    #     while betNum <= len(self.players) or self.openBet != self.players[playerNum].currBet():
-    #         if betNum == 1:
-    #             actions = ["Bet", "Check", "Fold"]
-    #         elif self.openBet == 0:
-    #             actions = ["Call", "Check", "Fold", "Raise"]
-    #         else:
-    #             actions = ["Call", "Fold", "Raise"]
-    #         currBet = self.players[playerNum].getBet(self.community, actions)
-    #         if currBet >= self.openBet:
-    #             self.openBet = currBet
-    #         playerNum = self.nextActive(playerNum)
-    #         betNum += 1
-        
-
-    #     roundPot = 0
-    #     roundActive = 0
-    #     for player in self.players:
-    #         roundPot += player.currBet()
-    #         if player.currBet() != 0:
-    #             roundActive += 1
-        
-    #     for player in self.players:
-    #         if player.isActive():
-    #             if player.currBet() < self.openBet:
-    #                 player.setExpect(player.currBet() * roundActive)
-    #             else:
-    #                 player.setExpect(self.pot + roundPot)
-        
-    #     self.pot += roundPot
-    
-    # def results(self):
-    #     maxVal = 0
-    #     maxHand = None
-    #     winner = None
-    #     for player in self.players:
-    #         currHand, currVal = self.handValue(player.getHand())
-    #         if currVal > maxVal:
-    #             maxVal = currVal
-    #             maxHand = currHand
-    #             winner = player
-    #         elif currVal == maxVal:
-    #             result = tiebreak(maxHand, currHand, currVal)
-    #             if result < 0:
-    #                 maxHand = currHand
-    #             elif result == 0:
-
-    #             else:
-
-                
-    #     pass
-
+    def getBestHandVal(self, playerID):
+        return max([Hand(handCards).getHandValue() for handCards in combinations(self.boardCards + self.players[playerID].cards, 5)])
 
 def main():
     # players = [Player("arnold"), Player("bom"), Player("cork"), Player("probaldo", True, Bot())]
@@ -417,22 +277,47 @@ def main():
 
     # testHand = Hand((Card("hearts", 12), Card("clubs", 10), Card("spades", 11), Card("diamonds", 13), Card("hearts", 9)))
 
-    hands = []
+    # hands = []
 
-    for x in range(100):
-        deck = Deck()
-        deck.shuffle()
-        for i in range(10):
-            hands.append(Hand(deck.dealCards(5)))
+    # for x in range(100):
+    #     deck = Deck()
+    #     deck.shuffle()
+    #     for i in range(10):
+    #         hands.append(Hand(deck.dealCards(5)))
     
-    hands.sort(key = lambda x: x.getHandValue(), reverse = True)
+    # hands.sort(key = lambda x: x.getHandValue(), reverse = True)
     
-    for i in range(10): 
-        print(f"{i+1}: {hands[i]} \t | {hands[i].getHandValue():,}")
+    # for i in range(10): 
+    #     print(f"{i+1}: {hands[i]} \t | {hands[i].getHandValue():,}")
     
-    g = Poker([HumanPlayer("Vervov",100)])
+    g = Poker([HumanPlayer("Vervov",100), HumanPlayer("Violet",100)])
     g.start()
+    # p = Pot()
+    # print("betting round 1")
+    # bets = enumerate([100, 150, 50, 150])
+    # for x, betAmount in bets:
+    #     # betAmount = (x % 2) * 50 + 100
+    #     print(x, betAmount)
+    #     p.addToPot(x,betAmount)
+    # p.addToPot(0,200)
+    # p.addToPot(1,200)
+    # # p.addToPot(3, 0)
+    # # p.addToPot(3,200)
+    # p.advanceRound()
+
+    # print("betting round 2")
+    # bets = [(0,100),(3,200)]
+    # for x, betAmount in bets:
+    #     # betAmount = (x % 2) * 50 + 100
+    #     print(x, betAmount)
+    #     p.addToPot(x,betAmount)
+    # p.advanceRound()
+    # print("splitting")
+    # for a,b in p.splitPot([2]).items():
+    #     print(a, b)
     
+    #2
+
     # testHand2 = Hand((Card("hearts", 12), Card("clubs", 9), Card("spades", 12), Card("diamonds", 13), Card("hearts", 9)))
     
     

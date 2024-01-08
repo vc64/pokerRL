@@ -8,7 +8,7 @@ class CardPlayer:
         self.losses = 0
         self.name = name
         self.cards = []
-        self.inGame = False
+        # self.inGame = False
         self.inRound = False
 
     def makeMove(self, game):
@@ -17,7 +17,11 @@ class CardPlayer:
     def addToHand(self, cards):
         for card in cards:
             self.cards.append(card)
-    
+
+class PokerPlayer(CardPlayer):
+    def __init__(self, name: str, score: int):
+        super().__init__(name, score)
+        self.isAllIn = False
 
 
     # def getMoney(self):
@@ -83,13 +87,13 @@ class CardPlayer:
     #     print("Balance: $" + str(self.getMoney))
 
 
-class HumanPlayer(CardPlayer):
-    def __init__(self, name, score):
+class HumanPlayer(PokerPlayer):
+    def __init__(self, name, score: int):
         super().__init__(name, score)
         self.currBet = 0
     
     def makeMove(self, game, moveObj):
-        validMoveActions = game.getValidMoveActions()
+        validMoveActions = moveObj.validMoveActions
 
         print(f"{self.name}'s turn. Hand: {self.cards}") 
         print(f"Board: {game.boardCards}")
@@ -101,14 +105,16 @@ class HumanPlayer(CardPlayer):
             moveActionNum = input("Please select an action by their corresponding number: ")
             while not (moveActionNum.isnumeric() and 1 <= int(moveActionNum) and int(moveActionNum) <= len(validMoveActions)):
                 moveActionNum = input("Invalid action. Please choose a valid action: ")
-            moveAction = validMoveActions[int(moveActionNum-1)]
+            moveAction = validMoveActions[int(moveActionNum)-1]
             moveAmount = 0
             if moveAction in ["Bet", "Raise"]:
                 moveAmount = input(f"Please specify amount for {moveAction} (positive integers only): ")
                 while not moveAmount.isnumeric():
                     moveAmount = input(f"Invalid amount. Please specify amount for {moveAction} (positive integers only): ")
-            madeValidMove = moveObj.setMove(moveAction, moveAmount)
-        self.currBet = moveAmount
+            madeValidMove = moveObj.setMove(moveAction, int(moveAmount))
+        self.currBet = int(moveAmount)
+        print()
+
     
     def updateScore(self, val):
         self.score += val
