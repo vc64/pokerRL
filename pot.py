@@ -18,6 +18,9 @@ class Pot:
     # since an AllIn could occur any time during a round, it may be easier to have update to sidepot during advanceRound
     # need to also accoutn for multiple AllIns in one round, not quite sure
 
+    def getTotal(self):
+        return sum(self.totals.values()) + sum(self.bets.values())
+
     def advanceTurn(self):
         sortedBets = sorted(self.bets.items(), key=lambda x : x[1])
         numBets = len(self.bets)
@@ -34,7 +37,9 @@ class Pot:
             self.totals[playerID] += roundBet
             i += 1
         
+        turnBets = self.bets
         self.bets = {}
+        return turnBets
 
     def addToPot(self, playerID, amount, isAllIn = False):
         # if not self.isCurrentPot:
@@ -57,6 +62,7 @@ class Pot:
     # debug :(
     # work on bot eventually
 
+    # [[1],[2,3,4]]
 
     def splitPot(self, tieredWinnerIDs):
         outputSplit = {}
@@ -68,20 +74,20 @@ class Pot:
                 currWin = 0
                 prevMaxWin = 0
                 playerSplit = {}
-                maxWinnerTotal = max([self.totals[playerID] for playerID in winnerIDs])
+                # maxWinnerTotal = max([self.totals[playerID] for playerID in winnerIDs])
                 for playerID, maxWin in playerWinnings:
                     if playerID in winnerIDs:
                         if maxWin != prevMaxWin:
                             currWin += round((maxWin - prevMaxWin) / winnerCount, 1)
-                        playerSplit[playerID] = currWin - self.totals[playerID]
+                        playerSplit[playerID] = currWin # - self.totals[playerID]
                         winnerCount -= 1
                         prevMaxWin = maxWin
-                    else:
-                        playerSplit[playerID] = -min(self.totals[playerID], maxWinnerTotal)
+                    # else:
+                    #     playerSplit[playerID] = -min(self.totals[playerID], maxWinnerTotal)
                 
-                if sum([playerSplit[x] for x in playerSplit]) != 0:
-                    raise Exception("Pot split incorrectly.")
-                outputSplit.update(playerSplit)
+                # if sum([playerSplit[x] for x in playerSplit]) != 0:
+                #     raise Exception("Pot split incorrectly.")
+                # outputSplit.update(playerSplit)
             else:
                 currPlayerID = winnerIDs[0]
                 outputSplit[currPlayerID] = self.maxWinnings[currPlayerID]
@@ -93,8 +99,6 @@ class Pot:
         # perWinnerEarning = round(sum([x[1] for x in self.amounts.values()]) / len(winnerIDs), 1) 
         # for playerID in winnerIDs:
         #     playerWinnings[playerID] += perWinnerEarning
-            
-
 
 
         # active = []

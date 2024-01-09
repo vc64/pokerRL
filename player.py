@@ -92,12 +92,12 @@ class HumanPlayer(PokerPlayer):
         super().__init__(name, score)
         self.currBet = 0
     
-    def makeMove(self, game, moveObj):
-        validMoveActions = moveObj.validMoveActions
+    def makeMove(self, moveObj):
+        validMoveActions = moveObj.gameInfo["validMoveActions"]
 
         print(f"{self.name}'s turn. Hand: {self.cards}") 
-        print(f"Board: {game.boardCards}")
-        print(f"Balance: {self.score}")
+        print(f"Board: {moveObj.gameInfo['boardCards']}")
+        print(f"Balance: {self.score - self.currBet}   Pot: {moveObj.gameInfo['potTotal']}   Current bet: {self.currBet}   Bet to meet: {moveObj.gameInfo['lastNotableMove']}")
         print(f"Valid actions: {'  '.join([f'({i+1}) {validMoveActions[i]}' for i in range(len(validMoveActions))])}")
 
         madeValidMove = False
@@ -112,7 +112,7 @@ class HumanPlayer(PokerPlayer):
                 while not moveAmount.isnumeric():
                     moveAmount = input(f"Invalid amount. Please specify amount for {moveAction} (positive integers only): ")
             madeValidMove = moveObj.setMove(moveAction, int(moveAmount))
-        self.currBet = int(moveAmount)
+        # self.currBet = int(moveAmount)
         print()
 
     

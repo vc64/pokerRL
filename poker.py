@@ -23,7 +23,12 @@ class PokerMove(Move):
         self.action = ""
         self.amount = -1
         self.isSet = False
-        self.validMoveActions = self.game.getValidMoveActions(self.playerID)
+        self.gameInfo = {
+            "boardCards": self.game.boardCards, 
+            "validMoveActions": self.game.getValidMoveActions(self.playerID),
+            "lastNotableMove": self.game.lastNotableMove,
+            "potTotal": self.game.pot.getTotal()
+        }
         self.isValid = lambda : self.game.validMoveFunc(self.playerID)(self.action, self.amount)
         self.minBet = self.game.minBetFunc()
     
@@ -41,6 +46,9 @@ class PokerMove(Move):
         else:
             print("Invalid move: please try again.")
         return self.isSet
+    
+    def __str__(self):
+        return f"{self.action} {self.amount}"
 
 # class GameObs:
 #     """Observable-like class for Game"""
@@ -117,7 +125,11 @@ class Poker(CardGame):
         # pre-flop
         print("pre-flop")
         self.pot.addToPot(self.ids[-2], 0.5)
+        self.players[self.ids[-2]].updateScore(-0.5)
         self.pot.addToPot(self.ids[-1], 1)
+        self.players[self.ids[-1]].updateScore(-1)
+        self.pot.advanceTurn()
+        
         self.turn(2, 0)
 
         print("flop")
@@ -188,17 +200,22 @@ class Poker(CardGame):
             if self.playersInRound == 1 or (self.lastNotableMove != None and self.lastNotableMove.playerID == currPlayerID 
                 and self.lastNotableMove.amount == currPlayer.currBet):
                 break
-            currPlayer.makeMove(self, PokerMove(self, currPlayerID))
+            currPlayer.makeMove(PokerMove(self, currPlayerID))
 
             # update variables for next player
             index = (index + 1) % len(self.ids)
             currPlayerID = self.ids[index]
             currPlayer = self.players[currPlayerID]
         
-        self.pot.advanceTurn()
+        # signal end of turn to pot and subtract turn bets from players
+        for playerID, betAmount in self.pot.advanceTurn().items():
+            self.players[playerID].updateScore(-betAmount)
+            self.players[playerID].currBet = 0
+        
+        # reset for next turn
         self.lastNotableMove = None
-        if self.playersInRound == 2:
-            self.endRound()
+        # if self.playersInRound == 2:
+        #     self.endRound()
 
     def getValidMoveActions(self, playerID):
         """Return list of valid move actions for specific player."""
@@ -209,6 +226,8 @@ class Poker(CardGame):
             possibleMoves = [] if self.lastNotableMove.playerID == playerID else ["Call"]
             if self.players[playerID].score > self.lastNotableMove.amount:
                 possibleMoves.append("Raise")
+        elif self.lastNotableMove.action == "Call":
+            possibleMoves = ["Call"]
         possibleMoves.append("Fold")
         return possibleMoves
 
@@ -256,6 +275,7 @@ class Poker(CardGame):
             move.amount = self.lastNotableMove.amount
         
         self.pot.addToPot(move.playerID, move.amount)
+        self.players[move.playerID].currBet = move.amount
         print(f"Player {currPlayer.name}: {move.action}{' '+str(move.amount) if move.action in ['Bet', 'Call', 'Raise'] else ''}")
     
     def endRound(self):
