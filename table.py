@@ -21,7 +21,3 @@ class Deck:
     
     def cardCount(self):
         return len(self.cards)
-   
-
-class Board:
-    pass

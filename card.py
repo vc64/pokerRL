@@ -34,8 +34,6 @@ class Card:
     def compareVals(self, otherCard):
         """Compare two card values; returns -1 (less than), 0 (equal), 1 (greater than)"""
         return -1 if self._number < otherCard._number else 0 if self._number == otherCard._number else 1
-    
-
 
     def __repr__(self):
         return Vals(self._number).name + " of " + Suits[self._suit].value

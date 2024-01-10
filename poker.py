@@ -1,12 +1,11 @@
-from table import Deck, Board
-from card import Card, Hand
-from player import CardPlayer, HumanPlayer
+from table import Deck
+from card import Hand
+from player import HumanPlayer
 from bot import BotPlayer
 from pot import Pot
 
 import random
 from itertools import combinations
-import math
 
 import os, platform
 def clear():
@@ -57,29 +56,11 @@ class PokerMove(Move):
     def __str__(self):
         return f"{self.action} {self.amount}"
 
-# class GameObs:
-#     """Observable-like class for Game"""
-#     def __init__(self, funcs: list, ids = []):
-#         if (len(ids) != len(funcs)):
-#             ids = list(range(len(funcs)))
-#         self.playerFuncs = {}
-#         for i in range(len(funcs)):
-#             self.subscribe(funcs[i], ids[i])
-    
-#     def subscribe(self, playerFunc, playerID: int):
-#         self.playerFuncs[playerID] = playerFunc
-    
-#     def update(self, orderedIDs, gameObj, moveObj):
-#         for p in orderedIDs:
-#             moveObj.setPlayer(p)
-#             self.playerFuncs[p](gameObj, moveObj) # pass in game state in some format -> likely as game object
-
 class Game:
     """Represents a game."""
     def __init__(self, players = list, moves = list):
         self.players = dict(enumerate(players))
         self.ids = list(range(len(players)))
-        # self.obs = GameObs([p.makeMove for p in players], self.ids)
         self.moveActions = moves
     
     def start(self):
@@ -93,10 +74,6 @@ class Game:
     def isValidMove(self):
         """Check if specified move is valid."""
         pass
-
-    # def generateMove(self):
-    #     """Return a move object for the game."""
-    #     pass
 
     def update(self, move: Move):
         """Update game with given move."""
@@ -135,30 +112,6 @@ class Poker(CardGame):
             self.playRound()
             print(f"Balances: {', '.join([f'{self.players[playerID].name}: {self.players[playerID].score}' for playerID in self.ids])}")
             input("Press enter to continue the game.")
-
-        # for playerID in self.ids:
-        #     currPlayer = self.players[playerID]
-        #     currPlayer.addToHand(self.deck.dealCards(2))
-        #     currPlayer.makeMove(self, PokerMove(self, playerID, self.validMoveFunc(playerID)))
-
-        # self.obs.update(self.ids, self, PokerMove())
-
-        # flop
-        # print("flop")
-        # self.boardCards.append(self.deck.dealCards(3))
-        # self.obs.update(self.ids, self)
-
-        # # turn
-        # print("turn")
-        # self.boardCards.append(self.deck.dealCards())
-        # self.obs.update(self.ids, self)
-
-        # # river
-        # print("flop")
-        # self.boardCards.append(self.deck.dealCards())
-        # self.obs.update(self.ids, self)
-
-        # showdown
     
     def playRound(self):
         self.ids.append(self.ids.pop(0))
@@ -205,12 +158,9 @@ class Poker(CardGame):
                 tieredPlayers[-1].append(playerID)
         
         for playerID, winAmount in self.pot.splitPot(tieredPlayers).items():
-            # print(winAmount)
             self.players[playerID].updateScore(winAmount)
             print(f"{self.players[playerID].name} won {winAmount} bb")
         
-        # for playerID in self.ids:
-        #     print(f"{self.players[playerID].name} {self.players[playerID].score} bb")
         self.playersInRound = 0
     
     def turn(self, turnName: str):
@@ -234,9 +184,6 @@ class Poker(CardGame):
         currPlayer = self.players[currPlayerID]
         while currPlayer.inRound:
             clear()
-            # if self.lastNotableMove != None:
-                # print(self.lastNotableMove.action, self.lastNotableMove.amount, self.lastNotableMove.playerID)
-                # print(currPlayerID, currPlayer.currBet)
             print(f"===== {turnName} =====")
             print(f"Board: {self.boardCards}")
             if self.playersInRound == 1 or (self.lastNotableMove != None and self.lastNotableMove.playerID == currPlayerID 
@@ -256,8 +203,6 @@ class Poker(CardGame):
         
         # reset for next turn
         self.lastNotableMove = None
-        # if self.playersInRound == 1:
-        #     self.endRound()
 
     def getValidMoveActions(self, playerID):
         """Return list of valid move actions for specific player."""
@@ -293,14 +238,11 @@ class Poker(CardGame):
                 return -1
         return minBet
 
-    # def generateMove(self):
-    #     return PokerMove(self, )
-
     def update(self, move: PokerMove):
         """Update game with given move. Should only be called after move is validated."""
         currPlayer = self.players[move.playerID]
         currPlayer.inRound = move.action != "Fold"
-        self.playersInRound -= move.action == "Fold" # or (not currPlayer.isAllIn and move.amount == currPlayer.score)     
+        self.playersInRound -= move.action == "Fold"    
         currPlayer.isAllIn = move.amount == currPlayer.score
 
         if move.action == "Check" and (self.lastNotableMove == None or self.lastNotableMove.action != "Check"):
